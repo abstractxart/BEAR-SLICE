@@ -425,6 +425,22 @@ export class FruitSliceGameScene extends Phaser.Scene {
     return t || this.makePopupText(-9999,-9999,"", "#fff", 18, true);
   }
 
+  // --- NEW: rebuild presentation pools after a restart (fix for trails dying) ---
+  private rewarmPresentationPools(): void {
+    if (!PRESENTATION_ONLY) return;
+    // reset indices
+    this.sliceLinePoolIndex = 0;
+    this.popupTextPoolIndex = 0;
+    // drop any old references to destroyed objects
+    this.sliceLinePool = [];
+    this.popupTextPool = [];
+    // ensure groups exist (they do; we just cleared them)
+    if (!this.sliceTrails) this.sliceTrails = this.add.group();
+    // re-prime pools
+    for (let i = 0; i < 48; i++) this.sliceLinePool.push(this.makeLine(0,0,0,0,0xffffff, 4, true));
+    for (let i = 0; i < 12; i++) this.popupTextPool.push(this.makePopupText(-9999,-9999,"", "#fff", 18, true));
+  }
+
   createSliceTrail(x: number, y: number): void {
     if (!this.lastSlicePoint) return;
 
@@ -1603,7 +1619,21 @@ export class FruitSliceGameScene extends Phaser.Scene {
     this.rapidFireMode = false; this.rapidFireEndTime = 0; this.chaosMode = false; this.chaosModeEndTime = 0;
     this.isFrenzyMode = false; this.frenzyModeEndTime = 0; this.totalSlices = 0; this.perfectSlices = 0;
     this.currentSliceStreak = 0; this.maxCombo = 0; this.scoreMultiplier = 1; this.lastSliceTime = 0;
-    this.fruits.clear(true, true); this.sliceTrails.clear(true, true); this.particles.clear(true, true);
+
+    // ensure input state is clean
+    this.isPaused = false;
+    this.isSlicing = false;
+    this.slicePath = [];
+    this.lastSlicePoint = undefined;
+
+    // clear groups (destroy old children) then REBUILD presentation pools
+    this.fruits.clear(true, true);
+    this.sliceTrails.clear(true, true);
+    this.particles.clear(true, true);
+
+    // 🔧 Critical fix: the slice/popup pools were destroyed above; rebuild them
+    this.rewarmPresentationPools();
+
     this.physics.world.timeScale = 1; this.time.timeScale = 1;
     this.cleanupPostProcessingEffects();
     this.deactivateGoldenFruitZoom();
