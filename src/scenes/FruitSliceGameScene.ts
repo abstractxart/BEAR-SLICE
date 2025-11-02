@@ -70,6 +70,11 @@ export class FruitSliceGameScene extends Phaser.Scene {
   public fruitSpawnTimer?: Phaser.Time.TimerEvent;
   public comboTimer?: Phaser.Time.TimerEvent;
   public goldenFruitTimer?: Phaser.Time.TimerEvent;
+
+  // Timer and tween tracking for proper cleanup
+  private activeTimers: Phaser.Time.TimerEvent[] = [];
+  private activeTweens: Phaser.Tweens.Tween[] = [];
+  private activeGraphics: Phaser.GameObjects.Graphics[] = [];
   
   // Game objects
   public fruits!: Phaser.GameObjects.Group; // Note: keeping 'fruits' name for compatibility
@@ -174,7 +179,12 @@ export class FruitSliceGameScene extends Phaser.Scene {
 
   create(): void {
     console.log("Creating FruitSliceGameScene...");
-    
+
+    // Initialize tracking arrays
+    this.activeTimers = [];
+    this.activeTweens = [];
+    this.activeGraphics = [];
+
     // Initialize game state
     this.lives = gameplayConfig.lives.value;
     this.score = 0;
@@ -257,11 +267,11 @@ export class FruitSliceGameScene extends Phaser.Scene {
       currentLevelKey: this.scene.key
     });
     
-    // Setup scene events for pause/resume
-    this.events.on('resume', () => {
+    // Setup scene events for pause/resume (use once to prevent listener accumulation)
+    this.events.once('resume', () => {
       this.resumeGame();
     });
-    
+
     // Setup scene shutdown event to cleanup music
     this.events.once('shutdown', () => this.shutdown());
     
@@ -1099,7 +1109,10 @@ export class FruitSliceGameScene extends Phaser.Scene {
       if (fruitSprite.active && fruitSprite.body) {
         const body = fruitSprite.body as Phaser.Physics.Arcade.Body;
         const fruitData = (fruitSprite as any).fruitData;
-        
+
+        // Null safety check for physics body
+        if (!body) return;
+
         // Only reset physics for non-hourglass fruits
         if (!fruitData || !fruitData.isGolden) {
           // Ensure proper gravity is applied to regular fruits
@@ -1152,7 +1165,8 @@ export class FruitSliceGameScene extends Phaser.Scene {
       });
       
       // Fade out after showing
-      this.time.delayedCall(2000, () => {
+      this.trackTimer(this.time.delayedCall(2000, () => {
+        if (this.isGameOver) return;
         this.tweens.add({
           targets: notificationText,
           alpha: 0,
@@ -1161,7 +1175,7 @@ export class FruitSliceGameScene extends Phaser.Scene {
           ease: 'Power2',
           onComplete: () => notificationText.destroy()
         });
-      });
+      }));
     }
   }
 
@@ -1274,10 +1288,11 @@ export class FruitSliceGameScene extends Phaser.Scene {
     }
     
     // Add a brief delay before zoom out to let players enjoy the moment
-    this.time.delayedCall(500, () => {
+    this.trackTimer(this.time.delayedCall(500, () => {
+      if (this.isGameOver) return;
       // Stop following the golden fruit
       this.cameras.main.stopFollow();
-      
+
       // Zoom out camera smoothly
       this.tweens.add({
         targets: this.cameras.main,
@@ -1285,7 +1300,7 @@ export class FruitSliceGameScene extends Phaser.Scene {
         duration: 1000,
         ease: 'Power2'
       });
-      
+
       // Return camera to center position
       this.tweens.add({
         targets: this.cameras.main,
@@ -1298,7 +1313,7 @@ export class FruitSliceGameScene extends Phaser.Scene {
           this.cameras.main.centerOn(this.scale.gameSize.width / 2, this.scale.gameSize.height / 2);
         }
       });
-    });
+    }));
     
     // Emit event for UI
     this.events.emit('goldenFruitZoomDeactivated');
@@ -1312,9 +1327,14 @@ export class FruitSliceGameScene extends Phaser.Scene {
       emitter.start();
       
       // Follow the fruit with particles
-      const followParticles = this.time.addEvent({
+      const followParticles = this.trackTimer(this.time.addEvent({
         delay: 50,
         callback: () => {
+          if (this.isGameOver) {
+            emitter.stop();
+            followParticles.destroy();
+            return;
+          }
           if (this.activeGoldenFruit === goldenFruit && goldenFruit.active) {
             emitter.setPosition(goldenFruit.x, goldenFruit.y);
           } else {
@@ -1323,7 +1343,7 @@ export class FruitSliceGameScene extends Phaser.Scene {
           }
         },
         loop: true
-      });
+      }));
     }
     
     // Add golden tint and glow
@@ -1414,20 +1434,24 @@ export class FruitSliceGameScene extends Phaser.Scene {
 
   finalizeGoldenFruit(): void {
     if (!this.activeGoldenFruit) return;
-    
+
+    // Kill all tweens on the golden fruit to prevent memory leaks
+    this.tweens.killTweensOf(this.activeGoldenFruit);
+
     // Clean completion without cluttering text messages
-    
+
     // Create final explosion effect
     this.createFinalGoldenExplosion(this.activeGoldenFruit);
     
     // Wait for dramatic effect before starting zoom out
-    this.time.delayedCall(1500, () => {
+    this.trackTimer(this.time.delayedCall(1500, () => {
+      if (this.isGameOver) return;
       // Deactivate zoom effect after dramatic pause
       this.deactivateGoldenFruitZoom();
-      
+
       // Set brief cooldown period after golden fruit for gentle transition
       this.postGoldenFruitCooldown = this.time.now + 3000; // 3 second cooldown
-      
+
       // Resume fruit spawning after golden mode
       this.resumeFruitSpawning();
       
@@ -1452,7 +1476,7 @@ export class FruitSliceGameScene extends Phaser.Scene {
         this.goldenFruitTimer.destroy();
         this.goldenFruitTimer = undefined;
       }
-    });
+    }));
   }
 
 
@@ -1496,14 +1520,16 @@ export class FruitSliceGameScene extends Phaser.Scene {
     for (let ring = 0; ring < 3; ring++) {
       const delayTime = ring * 200;
       const ringColor = colors[ring % colors.length];
-      
-      this.time.delayedCall(delayTime, () => {
+
+      this.trackTimer(this.time.delayedCall(delayTime, () => {
+        if (this.isGameOver) return;
         const ringGraphics = this.add.graphics();
+        this.trackGraphics(ringGraphics);
         ringGraphics.lineStyle(8, ringColor, 0.8);
         ringGraphics.strokeCircle(centerX, centerY, 50);
         ringGraphics.setBlendMode(Phaser.BlendModes.ADD);
         ringGraphics.setDepth(5); // Below hourglass depth
-        
+
         this.tweens.add({
           targets: ringGraphics,
           scaleX: 8,
@@ -1513,7 +1539,7 @@ export class FruitSliceGameScene extends Phaser.Scene {
           ease: 'Power2',
           onComplete: () => ringGraphics.destroy()
         });
-      });
+      }));
     }
     
     // Multiple massive particle explosions with different colors
@@ -1521,9 +1547,10 @@ export class FruitSliceGameScene extends Phaser.Scene {
       const emitter = this.juiceEmitters.get(color);
       if (emitter) {
         emitter.setPosition(centerX, centerY);
-        this.time.delayedCall(index * 100, () => {
+        this.trackTimer(this.time.delayedCall(index * 100, () => {
+          if (this.isGameOver) return;
           emitter.explode(30 + index * 10); // Staggered particle bursts
-        });
+        }));
       }
     });
     
@@ -1665,82 +1692,99 @@ export class FruitSliceGameScene extends Phaser.Scene {
 
   createRapidZigzag(goldenFruit: Phaser.GameObjects.Image, initialX: number, initialY: number): void {
     const zigzag = () => {
+      // Stop recursion if game is over or fruit is no longer active
+      if (this.isGameOver || !goldenFruit.active || this.activeGoldenFruit !== goldenFruit) return;
+
       const targetX = initialX + (Math.random() - 0.5) * 80;
       const targetY = initialY + (Math.random() - 0.5) * 50;
-      
-      this.tweens.add({
+
+      this.trackTween(this.tweens.add({
         targets: goldenFruit,
         x: targetX,
         y: targetY,
         duration: 300 + Math.random() * 200,
         ease: 'Power1',
         onComplete: zigzag
-      });
+      }));
     };
     zigzag();
   }
 
   createChaosEight(goldenFruit: Phaser.GameObjects.Image, initialX: number, initialY: number): void {
     let startTime = this.time.now;
-    this.tweens.add({
+    this.trackTween(this.tweens.add({
       targets: goldenFruit,
       duration: 50,
       repeat: -1,
       onUpdate: () => {
+        // Stop if game is over or fruit is no longer active
+        if (this.isGameOver || !goldenFruit.active || this.activeGoldenFruit !== goldenFruit) {
+          this.tweens.killTweensOf(goldenFruit);
+          return;
+        }
         const t = (this.time.now - startTime) * 0.006; // Faster than before
         goldenFruit.x = initialX + 70 * Math.cos(t);
         goldenFruit.y = initialY + 40 * Math.sin(t * 2);
       }
-    });
+    }));
   }
 
   createErraticBurst(goldenFruit: Phaser.GameObjects.Image, initialX: number, initialY: number): void {
     const burst = () => {
+      // Stop recursion if game is over or fruit is no longer active
+      if (this.isGameOver || !goldenFruit.active || this.activeGoldenFruit !== goldenFruit) return;
+
       const targetX = initialX + (Math.random() - 0.5) * 100;
       const targetY = initialY + (Math.random() - 0.5) * 70;
-      
-      this.tweens.add({
+
+      this.trackTween(this.tweens.add({
         targets: goldenFruit,
         x: targetX,
         y: targetY,
         duration: 150 + Math.random() * 150, // Very fast movements
         ease: 'Power2',
         onComplete: burst
-      });
+      }));
     };
     burst();
   }
 
   createSpeedDemon(goldenFruit: Phaser.GameObjects.Image, initialX: number, initialY: number): void {
     const speedMove = () => {
+      // Stop recursion if game is over or fruit is no longer active
+      if (this.isGameOver || !goldenFruit.active || this.activeGoldenFruit !== goldenFruit) return;
+
       const targetX = initialX + (Math.random() - 0.5) * 120;
       const targetY = initialY + (Math.random() - 0.5) * 80;
-      
-      this.tweens.add({
+
+      this.trackTween(this.tweens.add({
         targets: goldenFruit,
         x: targetX,
         y: targetY,
         duration: 100 + Math.random() * 100, // Ultra fast
         ease: 'Power3',
         onComplete: speedMove
-      });
+      }));
     };
     speedMove();
   }
 
   createNightmareMovement(goldenFruit: Phaser.GameObjects.Image, initialX: number, initialY: number): void {
     const nightmare = () => {
+      // Stop recursion if game is over or fruit is no longer active
+      if (this.isGameOver || !goldenFruit.active || this.activeGoldenFruit !== goldenFruit) return;
+
       const targetX = initialX + (Math.random() - 0.5) * 140;
       const targetY = initialY + (Math.random() - 0.5) * 90;
-      
-      this.tweens.add({
+
+      this.trackTween(this.tweens.add({
         targets: goldenFruit,
         x: targetX,
         y: targetY,
         duration: 80 + Math.random() * 80, // Insanely fast
         ease: 'Power4',
         onComplete: nightmare
-      });
+      }));
     };
     nightmare();
   }
@@ -2107,7 +2151,14 @@ export class FruitSliceGameScene extends Phaser.Scene {
     // Add physics
     this.physics.add.existing(fruit);
     const body = fruit.body as Phaser.Physics.Arcade.Body;
-    
+
+    // Null safety check for physics body
+    if (!body) {
+      console.error("Failed to create physics body for fruit");
+      fruit.destroy();
+      return;
+    }
+
     // Enhanced difficulty modifications
     const totalDifficultyLevel = this.getTotalDifficultyLevel();
     
@@ -2132,11 +2183,12 @@ export class FruitSliceGameScene extends Phaser.Scene {
     body.setVelocity(finalVelocityX * speedMultiplier, finalVelocityY * speedMultiplier);
     
     // PHYSICS SAFETY: Ensure proper gravity for all fruit types
+    // Note: Golden fruits start with normal gravity until activated
     if (fruitData.isGolden && this.activeGoldenFruit === fruit) {
       // Hourglass gets special zero gravity when it's the active one
       body.setGravityY(0);
     } else {
-      // All other fruits (including inactive hourglasses) get normal gravity
+      // All other fruits (including not-yet-activated hourglasses) get normal gravity
       body.setGravityY(gameplayConfig.fruitGravity.value * gravityMultiplier);
     }
     
@@ -2331,11 +2383,12 @@ export class FruitSliceGameScene extends Phaser.Scene {
     }
     
     // Reset fire streak timer
-    this.time.delayedCall(2000, () => {
+    this.trackTimer(this.time.delayedCall(2000, () => {
+      if (this.isGameOver) return;
       if (!this.isOnFire) {
         this.fireStreakCount = 0;
       }
-    });
+    }));
   }
 
   activateOnFireMode(): void {
@@ -2360,11 +2413,12 @@ export class FruitSliceGameScene extends Phaser.Scene {
     }
     
     this.showOnFireEffect();
-    
+
     // Deactivate after duration
-    this.time.delayedCall(gameplayConfig.onFireDuration.value, () => {
+    this.trackTimer(this.time.delayedCall(gameplayConfig.onFireDuration.value, () => {
+      if (this.isGameOver) return;
       this.deactivateOnFireMode();
-    });
+    }));
   }
 
   deactivateOnFireMode(): void {
@@ -2604,15 +2658,18 @@ export class FruitSliceGameScene extends Phaser.Scene {
 
   gameOver(): void {
     this.isGameOver = true;
-    
+
     // Check for personal best at game end
     this.checkPersonalBest();
-    
+
     // Add score to leaderboard
     const newRank = utils.addHighScore(this.score);
     const isHighScore = utils.isHighScore(this.score);
     const highScores = utils.getHighScores();
-    
+
+    // Cleanup all tracked resources to prevent memory leaks
+    this.cleanupAllTrackedResources();
+
     // Stop all timers
     if (this.fruitSpawnTimer) this.fruitSpawnTimer.destroy();
     if (this.comboTimer) this.comboTimer.destroy();
@@ -2716,13 +2773,16 @@ export class FruitSliceGameScene extends Phaser.Scene {
   }
 
   restart(): void {
+    // Cleanup all tracked resources to prevent memory leaks
+    this.cleanupAllTrackedResources();
+
     // Stop and cleanup background music to prevent overlapping
     if (this.backgroundMusic) {
       this.backgroundMusic.stop();
       this.backgroundMusic.destroy();
       this.backgroundMusic = undefined as any;
     }
-    
+
     // Reset game state
     this.lives = gameplayConfig.lives.value;
     this.score = 0;
@@ -2790,7 +2850,10 @@ export class FruitSliceGameScene extends Phaser.Scene {
       this.backgroundMusic.destroy();
       this.backgroundMusic = undefined as any;
     }
-    
+
+    // Cleanup all tracked resources
+    this.cleanupAllTrackedResources();
+
     // Cleanup timers
     if (this.fruitSpawnTimer) {
       this.fruitSpawnTimer.destroy();
@@ -2801,6 +2864,49 @@ export class FruitSliceGameScene extends Phaser.Scene {
     if (this.goldenFruitTimer) {
       this.goldenFruitTimer.destroy();
     }
+  }
+
+  // Resource tracking helper methods
+  private trackTimer(timer: Phaser.Time.TimerEvent): Phaser.Time.TimerEvent {
+    this.activeTimers.push(timer);
+    return timer;
+  }
+
+  private trackTween(tween: Phaser.Tweens.Tween): Phaser.Tweens.Tween {
+    this.activeTweens.push(tween);
+    return tween;
+  }
+
+  private trackGraphics(graphics: Phaser.GameObjects.Graphics): Phaser.GameObjects.Graphics {
+    this.activeGraphics.push(graphics);
+    return graphics;
+  }
+
+  private cleanupAllTrackedResources(): void {
+    // Cleanup all tracked timers
+    this.activeTimers.forEach(timer => {
+      if (timer && !timer.hasDispatched) {
+        timer.destroy();
+      }
+    });
+    this.activeTimers = [];
+
+    // Cleanup all tracked tweens
+    this.activeTweens.forEach(tween => {
+      if (tween && tween.isPlaying()) {
+        tween.stop();
+        tween.remove();
+      }
+    });
+    this.activeTweens = [];
+
+    // Cleanup all tracked graphics
+    this.activeGraphics.forEach(graphics => {
+      if (graphics && graphics.active) {
+        graphics.destroy();
+      }
+    });
+    this.activeGraphics = [];
   }
 
   // Enhanced Difficulty Progression System
@@ -2935,61 +3041,61 @@ export class FruitSliceGameScene extends Phaser.Scene {
   createRapidFireBurst(): void {
     // Create a rapid succession of single fruits
     const burstCount = Phaser.Math.Between(3, 6);
-    
+
     for (let i = 0; i < burstCount; i++) {
-      this.time.delayedCall(i * 200, () => {
+      this.trackTimer(this.time.delayedCall(i * 200, () => {
         if (!this.isGameOver) {
           this.createSingleFruit(0, 1, 'fruit');
         }
-      });
+      }));
     }
   }
 
   createSpiralPattern(count: number): void {
     const angleStep = 360 / count;
     for (let i = 0; i < count; i++) {
-      this.time.delayedCall(i * 150, () => {
+      this.trackTimer(this.time.delayedCall(i * 150, () => {
         if (!this.isGameOver) {
           this.createSingleFruit(i, count, undefined, 'spiral');
         }
-      });
+      }));
     }
   }
 
   createWavePattern(count: number): void {
     // Create fruits in a wave from left to right
     for (let i = 0; i < count; i++) {
-      this.time.delayedCall(i * 100, () => {
+      this.trackTimer(this.time.delayedCall(i * 100, () => {
         if (!this.isGameOver) {
           this.createSingleFruit(i, count, undefined, 'wave');
         }
-      });
+      }));
     }
   }
 
   createBombardmentPattern(count: number): void {
     // Mix of bombs and fruits in rapid succession
     for (let i = 0; i < count; i++) {
-      this.time.delayedCall(i * 120, () => {
+      this.trackTimer(this.time.delayedCall(i * 120, () => {
         if (!this.isGameOver) {
           const type = Math.random() < 0.3 ? 'bomb' : 'fruit';
           this.createSingleFruit(i, count, type);
         }
-      });
+      }));
     }
   }
 
   createPincerPattern(count: number): void {
     // Create fruits from both sides simultaneously
     const halfCount = Math.ceil(count / 2);
-    
+
     for (let i = 0; i < halfCount; i++) {
-      this.time.delayedCall(i * 150, () => {
+      this.trackTimer(this.time.delayedCall(i * 150, () => {
         if (!this.isGameOver) {
           this.createSingleFruit(i, count, undefined, 'left-to-right');
           this.createSingleFruit(i, count, undefined, 'right-to-left');
         }
-      });
+      }));
     }
   }
 
