@@ -4,7 +4,9 @@
       "Bash(dir publicassets*.png /b 2)",
       "Bash(nul)",
       "Bash(npm run build:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": []

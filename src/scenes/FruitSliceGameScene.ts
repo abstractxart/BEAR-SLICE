@@ -1528,26 +1528,26 @@ export class FruitSliceGameScene extends Phaser.Scene {
     // Remove overlay
     const overlay = (this as any).goldenFruitOverlay;
     if (overlay) {
-      this.tweens.add({
+      this.trackTween(this.tweens.add({
         targets: overlay,
         alpha: 0,
         duration: 500,
         ease: 'Power2',
         onComplete: () => overlay.destroy()
-      });
+      }));
       (this as any).goldenFruitOverlay = null;
     }
-    
+
     // Remove edge glow
     const edgeGlow = (this as any).goldenFruitEdgeGlow;
     if (edgeGlow) {
-      this.tweens.add({
+      this.trackTween(this.tweens.add({
         targets: edgeGlow,
         alpha: 0,
         duration: 300,
         ease: 'Power2',
         onComplete: () => edgeGlow.destroy()
-      });
+      }));
       (this as any).goldenFruitEdgeGlow = null;
     }
     
@@ -1558,15 +1558,15 @@ export class FruitSliceGameScene extends Phaser.Scene {
       this.cameras.main.stopFollow();
 
       // Zoom out camera smoothly
-      this.tweens.add({
+      this.trackTween(this.tweens.add({
         targets: this.cameras.main,
         zoom: 1,
         duration: 1000,
         ease: 'Power2'
-      });
+      }));
 
       // Return camera to center position
-      this.tweens.add({
+      this.trackTween(this.tweens.add({
         targets: this.cameras.main,
         scrollX: 0,
         scrollY: 0,
@@ -1576,7 +1576,7 @@ export class FruitSliceGameScene extends Phaser.Scene {
           // Reset camera to centered view
           this.cameras.main.centerOn(this.scale.gameSize.width / 2, this.scale.gameSize.height / 2);
         }
-      });
+      }));
     }));
     
     // Emit event for UI
@@ -3117,10 +3117,17 @@ export class FruitSliceGameScene extends Phaser.Scene {
     
     // Clean up post-processing effects smoothly
     this.cleanupPostProcessingEffects();
-    
+
     // Deactivate any zoom effects
     this.deactivateGoldenFruitZoom();
-    
+
+    // CRITICAL: Force immediate camera reset (since deactivateGoldenFruitZoom was called after cleanup)
+    // This prevents the game from being stuck in zoomed/offset state after restart
+    this.cameras.main.stopFollow();
+    this.cameras.main.setZoom(1);
+    this.cameras.main.setScroll(0, 0);
+    this.cameras.main.centerOn(this.scale.gameSize.width / 2, this.scale.gameSize.height / 2);
+
     // Restart spawning
     this.startFruitSpawning();
 
