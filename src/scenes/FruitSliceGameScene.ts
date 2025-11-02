@@ -3060,6 +3060,11 @@ export class FruitSliceGameScene extends Phaser.Scene {
     // Cleanup all tracked resources to prevent memory leaks
     this.cleanupAllTrackedResources();
 
+    // Reinitialize tracking arrays
+    this.activeTimers = [];
+    this.activeTweens = [];
+    this.activeGraphics = [];
+
     // Stop and cleanup background music to prevent overlapping
     if (this.backgroundMusic) {
       this.backgroundMusic.stop();
@@ -3118,7 +3123,10 @@ export class FruitSliceGameScene extends Phaser.Scene {
     
     // Restart spawning
     this.startFruitSpawning();
-    
+
+    // Reinitialize background music
+    this.initializeBackgroundMusic();
+
     // Update UI
     this.events.emit('gameRestarted');
     this.events.emit('scoreUpdated', this.score);
