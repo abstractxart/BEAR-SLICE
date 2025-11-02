@@ -2533,7 +2533,7 @@ export class FruitSliceGameScene extends Phaser.Scene {
         spawnX = screenWidth * Phaser.Math.FloatBetween(0.05, 0.25);
         spawnY = screenHeight + 50;
         const angle1 = Phaser.Math.DegToRad(Phaser.Math.Between(50, 70)); // Steep angle
-        const speed1 = Phaser.Math.Between(500, 650);
+        const speed1 = Phaser.Math.Between(750, 950); // INCREASED for full screen height
         velocityX = Math.cos(angle1) * speed1;
         velocityY = -Math.sin(angle1) * speed1;
         break;
@@ -2543,7 +2543,7 @@ export class FruitSliceGameScene extends Phaser.Scene {
         spawnX = screenWidth * Phaser.Math.FloatBetween(0.75, 0.95);
         spawnY = screenHeight + 50;
         const angle2 = Phaser.Math.DegToRad(Phaser.Math.Between(110, 130)); // Steep angle left
-        const speed2 = Phaser.Math.Between(500, 650);
+        const speed2 = Phaser.Math.Between(750, 950); // INCREASED for full screen height
         velocityX = Math.cos(angle2) * speed2;
         velocityY = -Math.sin(angle2) * speed2;
         break;
@@ -2554,14 +2554,14 @@ export class FruitSliceGameScene extends Phaser.Scene {
           spawnX = screenWidth * Phaser.Math.FloatBetween(0.0, 0.15);
           spawnY = screenHeight + 50;
           const angleL = Phaser.Math.DegToRad(Phaser.Math.Between(55, 75));
-          const speedL = Phaser.Math.Between(550, 700);
+          const speedL = Phaser.Math.Between(800, 1000); // INCREASED for full screen height
           velocityX = Math.cos(angleL) * speedL;
           velocityY = -Math.sin(angleL) * speedL;
         } else {
           spawnX = screenWidth * Phaser.Math.FloatBetween(0.85, 1.0);
           spawnY = screenHeight + 50;
           const angleR = Phaser.Math.DegToRad(Phaser.Math.Between(105, 125));
-          const speedR = Phaser.Math.Between(550, 700);
+          const speedR = Phaser.Math.Between(800, 1000); // INCREASED for full screen height
           velocityX = Math.cos(angleR) * speedR;
           velocityY = -Math.sin(angleR) * speedR;
         }
@@ -2573,14 +2573,14 @@ export class FruitSliceGameScene extends Phaser.Scene {
           // From left side
           spawnX = -50;
           spawnY = screenHeight * Phaser.Math.FloatBetween(0.45, 0.65);
-          velocityX = Phaser.Math.Between(400, 550);
-          velocityY = Phaser.Math.Between(-300, -150); // Slight upward arc
+          velocityX = Phaser.Math.Between(500, 650); // Slightly increased
+          velocityY = Phaser.Math.Between(-450, -300); // INCREASED upward arc
         } else {
           // From right side
           spawnX = screenWidth + 50;
           spawnY = screenHeight * Phaser.Math.FloatBetween(0.45, 0.65);
-          velocityX = Phaser.Math.Between(-550, -400);
-          velocityY = Phaser.Math.Between(-300, -150); // Slight upward arc
+          velocityX = Phaser.Math.Between(-650, -500); // Slightly increased
+          velocityY = Phaser.Math.Between(-450, -300); // INCREASED upward arc
         }
         break;
         
@@ -2593,7 +2593,7 @@ export class FruitSliceGameScene extends Phaser.Scene {
           spawnX = screenWidth * Phaser.Math.FloatBetween(0.3, 0.7);
           // Nearly straight up with slight angle variation (80-100 degrees)
           const angleClassic = Phaser.Math.DegToRad(Phaser.Math.Between(80, 100));
-          const speedClassic = Phaser.Math.Between(520, 680);
+          const speedClassic = Phaser.Math.Between(800, 1000); // INCREASED for full screen height
           velocityX = Math.cos(angleClassic) * speedClassic;
           velocityY = -Math.sin(angleClassic) * speedClassic;
         } else {
@@ -2605,7 +2605,7 @@ export class FruitSliceGameScene extends Phaser.Scene {
 
           // Add natural variation to each launch
           const angleSpread = Phaser.Math.DegToRad(Phaser.Math.Between(75, 105));
-          const speedSpread = Phaser.Math.Between(480, 650);
+          const speedSpread = Phaser.Math.Between(750, 950); // INCREASED for full screen height
           velocityX = Math.cos(angleSpread) * speedSpread;
           velocityY = -Math.sin(angleSpread) * speedSpread;
         }
