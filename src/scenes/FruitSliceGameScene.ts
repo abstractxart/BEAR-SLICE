@@ -86,7 +86,13 @@ export class FruitSliceGameScene extends Phaser.Scene {
   public isSlicing: boolean = false;
   public lastSlicePoint?: { x: number; y: number };
   public slicePath: { x: number; y: number }[] = [];
-  
+
+  // Enhanced blade trail for better slicing detection (Fruit Ninja style)
+  private bladeTrail: Array<{x: number, y: number, time: number}> = [];
+  private readonly BLADE_TRAIL_LENGTH = 10; // Keep last 10 points for collision detection
+  private readonly BLADE_WIDTH = 20; // Blade thickness for collision detection
+  private lastSwipeSpeed: number = 0;
+
   // Object types with rarity weights (replacing fruits)
   public fruitTypes: FruitType[] = [
     { key: "red_mask", sliceSound: "slice_red_mask", juiceColor: 0xff0000, points: 10, rarity: 100 }, // Common
@@ -131,6 +137,9 @@ export class FruitSliceGameScene extends Phaser.Scene {
   
   // Particle effects
   public juiceEmitters: Map<number, Phaser.GameObjects.Particles.ParticleEmitter> = new Map();
+
+  // Blade swish sound
+  public bladeSwishSound?: Phaser.Sound.BaseSound;
 
   constructor() {
     super({ key: "FruitSliceGameScene" });
@@ -371,32 +380,94 @@ export class FruitSliceGameScene extends Phaser.Scene {
     } catch (e) {
       this.hourglassHitCascadeSound = this.sound.add("ui_click", { volume: finalSfxVolume * 2.8 });
     }
+
+    // Blade swish sound for Fruit Ninja feel
+    try {
+      this.bladeSwishSound = this.sound.add("ui_click", { volume: finalSfxVolume * 0.4 });
+    } catch (e) {
+      console.warn("Blade swish sound not available");
+    }
   }
 
   initializeParticles(): void {
-    // Particle emitters completely removed for clean gameplay experience
+    // FRUIT NINJA STYLE: Re-enable particle effects for satisfying slice feedback
     this.fruitTypes.forEach(fruitType => {
-      // Initialize empty emitter map for compatibility but no actual particles
-      this.juiceEmitters.set(fruitType.juiceColor, null);
+      // Create particle emitter for each object color
+      const emitter = this.add.particles(0, 0, 'particle', {
+        speed: { min: 100, max: 400 },
+        angle: { min: 0, max: 360 },
+        scale: { start: 1, end: 0 },
+        alpha: { start: 1, end: 0 },
+        lifespan: 600,
+        gravityY: 400,
+        tint: fruitType.juiceColor,
+        blendMode: 'ADD',
+        frequency: -1, // Manual emission
+        maxParticles: 30
+      });
+
+      this.juiceEmitters.set(fruitType.juiceColor, emitter);
     });
+
+    // Add bomb smoke particles (black/grey)
+    const bombEmitter = this.add.particles(0, 0, 'particle', {
+      speed: { min: 50, max: 200 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1.5, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      lifespan: 800,
+      gravityY: -100, // Float up
+      tint: 0x333333,
+      blendMode: 'NORMAL',
+      frequency: -1,
+      maxParticles: 50
+    });
+
+    this.juiceEmitters.set(0x000000, bombEmitter); // Black for bombs
   }
 
   setupInputHandlers(): void {
     // Mouse/touch input
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (this.isGameOver || this.isPaused) return;
-      
+
       this.isSlicing = true;
       this.slicePath = [{ x: pointer.x, y: pointer.y }];
       this.lastSlicePoint = { x: pointer.x, y: pointer.y };
+      this.bladeTrail = [{ x: pointer.x, y: pointer.y, time: this.time.now }];
+      this.lastSwipeSpeed = 0;
     });
 
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (this.isGameOver || this.isPaused || !this.isSlicing) return;
-      
+
+      // Calculate swipe speed for blade swish sound
+      if (this.lastSlicePoint) {
+        const distance = Phaser.Math.Distance.Between(
+          this.lastSlicePoint.x, this.lastSlicePoint.y,
+          pointer.x, pointer.y
+        );
+        this.lastSwipeSpeed = distance;
+
+        // FRUIT NINJA STYLE: Play swish sound on fast swipes
+        if (distance > 15 && this.bladeSwishSound && !this.bladeSwishSound.isPlaying) {
+          const speedFactor = Math.min(distance / 30, 2.0); // Cap at 2x speed
+          this.bladeSwishSound.play({ rate: 0.8 + speedFactor * 0.4 });
+        }
+      }
+
       this.slicePath.push({ x: pointer.x, y: pointer.y });
+
+      // Add to blade trail with timestamp
+      this.bladeTrail.push({ x: pointer.x, y: pointer.y, time: this.time.now });
+
+      // Keep trail at maximum length
+      if (this.bladeTrail.length > this.BLADE_TRAIL_LENGTH) {
+        this.bladeTrail.shift();
+      }
+
       this.createSliceTrail(pointer.x, pointer.y);
-      this.checkFruitSlice(pointer.x, pointer.y);
+      this.checkFruitSliceWithBladePath(); // NEW: Check entire blade path
       this.lastSlicePoint = { x: pointer.x, y: pointer.y };
     });
 
@@ -404,6 +475,7 @@ export class FruitSliceGameScene extends Phaser.Scene {
       this.isSlicing = false;
       this.slicePath = [];
       this.lastSlicePoint = undefined;
+      this.bladeTrail = [];
     });
 
     // Pause key (ESC)
@@ -519,6 +591,93 @@ export class FruitSliceGameScene extends Phaser.Scene {
     }
   }
 
+  // NEW: Fruit Ninja style blade path detection using line-segment intersection
+  checkFruitSliceWithBladePath(): void {
+    if (this.bladeTrail.length < 2) return; // Need at least 2 points to make a line
+
+    const slicedFruits: Set<Phaser.GameObjects.Image> = new Set();
+
+    // Get the most recent blade segment
+    const recentSegmentStart = this.bladeTrail[this.bladeTrail.length - 2];
+    const recentSegmentEnd = this.bladeTrail[this.bladeTrail.length - 1];
+
+    // If we're in hourglass mode, only check the active hourglass
+    if (this.activeGoldenFruit) {
+      const fruitSprite = this.activeGoldenFruit;
+      if (fruitSprite.active && !(fruitSprite as any).isSliced) {
+        if (this.checkLineCircleIntersection(
+          recentSegmentStart.x, recentSegmentStart.y,
+          recentSegmentEnd.x, recentSegmentEnd.y,
+          fruitSprite.x, fruitSprite.y,
+          gameplayConfig.fruitSize.value * 0.75 // Slightly smaller hitbox for precision
+        )) {
+          slicedFruits.add(fruitSprite);
+        }
+      }
+    } else {
+      // Normal mode: check all objects
+      this.fruits.children.entries.forEach(fruit => {
+        const fruitSprite = fruit as Phaser.GameObjects.Image;
+        if (!fruitSprite.active || (fruitSprite as any).isSliced) return;
+
+        const fruitData = (fruitSprite as any).fruitData;
+        const fruitRadius = fruitData?.isGolden
+          ? gameplayConfig.fruitSize.value * 1.125 // Golden is 1.5x size, so radius * 0.75
+          : gameplayConfig.fruitSize.value * 0.75;
+
+        // Check if blade segment intersects with this fruit
+        if (this.checkLineCircleIntersection(
+          recentSegmentStart.x, recentSegmentStart.y,
+          recentSegmentEnd.x, recentSegmentEnd.y,
+          fruitSprite.x, fruitSprite.y,
+          fruitRadius
+        )) {
+          slicedFruits.add(fruitSprite);
+        }
+      });
+    }
+
+    // Slice all fruits that were hit by the blade path
+    if (slicedFruits.size > 0) {
+      slicedFruits.forEach(fruit => this.sliceFruit(fruit));
+      this.handleCombo(slicedFruits.size);
+      this.checkSpectacularSlice(slicedFruits.size);
+    }
+  }
+
+  // Line-circle intersection algorithm for precise blade detection
+  checkLineCircleIntersection(
+    x1: number, y1: number, // Line start
+    x2: number, y2: number, // Line end
+    cx: number, cy: number, // Circle center
+    radius: number
+  ): boolean {
+    // Vector from line start to circle center
+    const dx = cx - x1;
+    const dy = cy - y1;
+
+    // Vector of the line segment
+    const lx = x2 - x1;
+    const ly = y2 - y1;
+
+    // Length squared of line segment
+    const lenSq = lx * lx + ly * ly;
+
+    // Project point onto line, clamped to segment
+    let t = Math.max(0, Math.min(1, (dx * lx + dy * ly) / lenSq));
+
+    // Find closest point on line segment
+    const closestX = x1 + t * lx;
+    const closestY = y1 + t * ly;
+
+    // Distance from closest point to circle center
+    const distSq = (cx - closestX) * (cx - closestX) + (cy - closestY) * (cy - closestY);
+
+    // Check if within radius (add blade width for better feel)
+    const effectiveRadius = radius + this.BLADE_WIDTH / 2;
+    return distSq <= effectiveRadius * effectiveRadius;
+  }
+
   sliceFruit(fruit: Phaser.GameObjects.Image): void {
     const fruitData = (fruit as any).fruitData;
     
@@ -580,9 +739,15 @@ export class FruitSliceGameScene extends Phaser.Scene {
     
     // Create kaleidoscope blue wave slice effect
     this.createKaleidoscopeSliceEffect(fruit.x, fruit.y, sliceQuality);
-    
-    // Particle effects completely removed for clean gameplay experience
-    
+
+    // FRUIT NINJA STYLE: Emit particles on slice
+    const emitter = this.juiceEmitters.get(fruitData.juiceColor);
+    if (emitter) {
+      emitter.setPosition(fruit.x, fruit.y);
+      const particleCount = sliceQuality === 'perfect' ? 25 : 15;
+      emitter.explode(particleCount);
+    }
+
     // Calculate final score
     const basePoints = fruitData.points;
     const finalPoints = Math.floor(basePoints * finalMultiplier);
@@ -619,42 +784,76 @@ export class FruitSliceGameScene extends Phaser.Scene {
   }
 
   createSliceEffect(fruit: Phaser.GameObjects.Image, sliceQuality: string = 'normal'): void {
-    // Create two halves of the fruit
+    // FRUIT NINJA STYLE: Physics-based halves that fly apart realistically
     const leftHalf = this.add.image(fruit.x - 12, fruit.y, fruit.texture.key);
     const rightHalf = this.add.image(fruit.x + 12, fruit.y, fruit.texture.key);
-    
-    // Use the same size as the original fruit (2x larger)
+
+    // Use the same size as the original fruit
     utils.initScale(leftHalf, { x: 0.5, y: 0.5 }, undefined, gameplayConfig.fruitSize.value);
     utils.initScale(rightHalf, { x: 0.5, y: 0.5 }, undefined, gameplayConfig.fruitSize.value);
-    
+
     // Set crop to show only halves
     leftHalf.setCrop(0, 0, leftHalf.width / 2, leftHalf.height);
     rightHalf.setCrop(rightHalf.width / 2, 0, rightHalf.width / 2, rightHalf.height);
-    
-    // Enhanced animation based on slice quality
-    const speedMultiplier = sliceQuality === 'perfect' ? 1.2 : 1.0;
-    const distance = 120 * speedMultiplier;
-    
-    // Animate halves flying apart (adjusted for 2x fruit size)
-    this.tweens.add({
-      targets: leftHalf,
-      x: leftHalf.x - distance,
-      y: leftHalf.y + 60,
-      rotation: -0.5 * speedMultiplier,
+
+    // Add physics to halves
+    this.physics.add.existing(leftHalf);
+    this.physics.add.existing(rightHalf);
+
+    const leftBody = leftHalf.body as Phaser.Physics.Arcade.Body;
+    const rightBody = rightHalf.body as Phaser.Physics.Arcade.Body;
+
+    if (leftBody && rightBody) {
+      // Calculate slice direction from blade trail
+      const sliceAngle = this.calculateSliceAngle();
+
+      // Apply force perpendicular to slice direction
+      const speedMultiplier = sliceQuality === 'perfect' ? 1.4 : 1.0;
+      const baseForce = 350 * speedMultiplier;
+
+      // Left half flies to the left and slightly up
+      const leftAngle = sliceAngle + Math.PI / 2; // Perpendicular to slice
+      leftBody.setVelocity(
+        Math.cos(leftAngle) * baseForce,
+        Math.sin(leftAngle) * baseForce - 100 // Slight upward boost
+      );
+      leftBody.setGravityY(600); // Fall with gravity
+      leftBody.setAngularVelocity(-200); // Tumble counter-clockwise
+
+      // Right half flies to the right and slightly up
+      const rightAngle = sliceAngle - Math.PI / 2; // Opposite perpendicular
+      rightBody.setVelocity(
+        Math.cos(rightAngle) * baseForce,
+        Math.sin(rightAngle) * baseForce - 100 // Slight upward boost
+      );
+      rightBody.setGravityY(600); // Fall with gravity
+      rightBody.setAngularVelocity(200); // Tumble clockwise
+    }
+
+    // Fade out halves and destroy after they fall off screen
+    this.trackTween(this.tweens.add({
+      targets: [leftHalf, rightHalf],
       alpha: 0,
-      duration: 800,
-      onComplete: () => leftHalf.destroy()
-    });
-    
-    this.tweens.add({
-      targets: rightHalf,
-      x: rightHalf.x + distance,
-      y: rightHalf.y + 60,
-      rotation: 0.5 * speedMultiplier,
-      alpha: 0,
-      duration: 800,
-      onComplete: () => rightHalf.destroy()
-    });
+      duration: 1000,
+      delay: 300,
+      onComplete: () => {
+        leftHalf.destroy();
+        rightHalf.destroy();
+      }
+    }));
+  }
+
+  // Calculate the angle of the blade slice based on recent blade trail
+  calculateSliceAngle(): number {
+    if (this.bladeTrail.length < 2) {
+      return 0; // Default horizontal slice
+    }
+
+    // Get last two points to determine slice direction
+    const p1 = this.bladeTrail[this.bladeTrail.length - 2];
+    const p2 = this.bladeTrail[this.bladeTrail.length - 1];
+
+    return Math.atan2(p2.y - p1.y, p2.x - p1.x);
   }
 
   calculateSliceQuality(fruit: Phaser.GameObjects.Image): string {
@@ -817,7 +1016,72 @@ export class FruitSliceGameScene extends Phaser.Scene {
   }
 
   createComboText(comboCount: number): void {
-    // Combo text animations completely removed for clean gameplay experience
+    // FRUIT NINJA STYLE: Show combo feedback based on count
+    let message = "";
+    let color = "#ffffff";
+    let scale = 1.0;
+
+    if (comboCount >= 10) {
+      message = "INCREDIBLE!";
+      color = "#ff00ff";
+      scale = 2.0;
+    } else if (comboCount >= 7) {
+      message = "EXCELLENT!";
+      color = "#ffaa00";
+      scale = 1.7;
+    } else if (comboCount >= 5) {
+      message = "GREAT!";
+      color = "#00ff00";
+      scale = 1.4;
+    } else if (comboCount >= 3) {
+      message = "GOOD!";
+      color = "#00aaff";
+      scale = 1.2;
+    } else {
+      return; // Don't show text for combos below 3
+    }
+
+    const centerX = this.scale.gameSize.width / 2;
+    const centerY = this.scale.gameSize.height / 3;
+
+    const comboText = this.add.text(centerX, centerY, message, {
+      fontSize: `${48 * scale}px`,
+      fontFamily: 'Arial Black',
+      color: color,
+      stroke: '#000000',
+      strokeThickness: 6
+    });
+
+    comboText.setOrigin(0.5, 0.5);
+    comboText.setDepth(100);
+    comboText.setAlpha(0);
+    comboText.setScale(0.5);
+
+    // Animate in with bounce
+    this.trackTween(this.tweens.add({
+      targets: comboText,
+      alpha: 1,
+      scale: scale,
+      duration: 200,
+      ease: 'Back.easeOut'
+    }));
+
+    // Animate out
+    this.trackTween(this.tweens.add({
+      targets: comboText,
+      alpha: 0,
+      y: comboText.y - 50,
+      scale: scale * 1.2,
+      duration: 400,
+      delay: 600,
+      ease: 'Power2',
+      onComplete: () => comboText.destroy()
+    }));
+
+    // Add screen shake for high combos
+    if (comboCount >= 7) {
+      this.cameras.main.shake(150, 0.01);
+    }
   }
 
 
@@ -2200,17 +2464,15 @@ export class FruitSliceGameScene extends Phaser.Scene {
     // Add to group
     this.fruits.add(fruit);
     
-    // Add rotation with slight variation for visual appeal
-    const rotationSpeed = throwPattern === 'criss-cross' ? 
-      1800 + Phaser.Math.Between(-600, 600) : // Faster rotation for criss-cross
-      1800 + Phaser.Math.Between(-400, 400);
-    
-    this.tweens.add({
-      targets: fruit,
-      angle: 360,
-      duration: rotationSpeed,
-      repeat: -1
-    });
+    // FRUIT NINJA STYLE: Physics-based rotation tied to velocity
+    // Faster objects rotate faster, direction based on horizontal velocity
+    const totalVelocity = Math.sqrt(finalVelocityX * finalVelocityX + finalVelocityY * finalVelocityY);
+    const rotationDirection = finalVelocityX >= 0 ? 1 : -1; // Clockwise for right, counter-clockwise for left
+    const baseRotationSpeed = 1.5; // Radians per second at base velocity
+    const angularVelocity = (totalVelocity / 400) * baseRotationSpeed * rotationDirection;
+
+    // Store angular velocity on the fruit for realistic tumbling
+    (fruit as any).angularVelocity = angularVelocity;
     
     // Add trail effect for flying objects
     this.createFruitTrail(fruit, fruitData);
@@ -2260,83 +2522,93 @@ export class FruitSliceGameScene extends Phaser.Scene {
   calculateThrowTrajectory(pattern: string, index: number, totalCount: number): { spawnX: number, spawnY: number, velocityX: number, velocityY: number } {
     const screenWidth = this.scale.gameSize.width;
     const screenHeight = this.scale.gameSize.height;
-    const baseSpeed = gameplayConfig.fruitLaunchSpeed.value;
-    
+
     let spawnX: number, spawnY: number, velocityX: number, velocityY: number;
+
+    // FRUIT NINJA STYLE: Natural parabolic arcs using angles instead of fixed velocities
     
     switch (pattern) {
       case 'left-to-right':
-        // Spawn from left side, throw towards right (reduced intensity)
-        spawnX = -50;
-        spawnY = screenHeight * 0.7 + Phaser.Math.Between(-50, 50);
-        velocityX = Phaser.Math.Between(280, 400); // Reduced from 350-500 to 280-400
-        velocityY = Phaser.Math.Between(-550, -420); // Reduced from -650/-500 to -550/-420
+        // Launch from bottom-left with angle toward center-right
+        spawnX = screenWidth * Phaser.Math.FloatBetween(0.05, 0.25);
+        spawnY = screenHeight + 50;
+        const angle1 = Phaser.Math.DegToRad(Phaser.Math.Between(50, 70)); // Steep angle
+        const speed1 = Phaser.Math.Between(500, 650);
+        velocityX = Math.cos(angle1) * speed1;
+        velocityY = -Math.sin(angle1) * speed1;
         break;
-        
+
       case 'right-to-left':
-        // Spawn from right side, throw towards left (reduced intensity)
-        spawnX = screenWidth + 50;
-        spawnY = screenHeight * 0.7 + Phaser.Math.Between(-50, 50);
-        velocityX = Phaser.Math.Between(-400, -280); // Reduced from -500/-350 to -400/-280
-        velocityY = Phaser.Math.Between(-550, -420); // Reduced from -650/-500 to -550/-420
+        // Launch from bottom-right with angle toward center-left
+        spawnX = screenWidth * Phaser.Math.FloatBetween(0.75, 0.95);
+        spawnY = screenHeight + 50;
+        const angle2 = Phaser.Math.DegToRad(Phaser.Math.Between(110, 130)); // Steep angle left
+        const speed2 = Phaser.Math.Between(500, 650);
+        velocityX = Math.cos(angle2) * speed2;
+        velocityY = -Math.sin(angle2) * speed2;
         break;
         
       case 'criss-cross':
-        // Alternating directions for multiple fruits (reduced intensity)
+        // Alternating from left and right corners with crossing paths
         if (index % 2 === 0) {
-          // Even index: left to right
-          spawnX = -50;
-          spawnY = screenHeight * 0.8 + Phaser.Math.Between(-30, 30);
-          velocityX = Phaser.Math.Between(320, 420); // Reduced from 400-550 to 320-420
-          velocityY = Phaser.Math.Between(-600, -480); // Reduced from -700/-550 to -600/-480
+          spawnX = screenWidth * Phaser.Math.FloatBetween(0.0, 0.15);
+          spawnY = screenHeight + 50;
+          const angleL = Phaser.Math.DegToRad(Phaser.Math.Between(55, 75));
+          const speedL = Phaser.Math.Between(550, 700);
+          velocityX = Math.cos(angleL) * speedL;
+          velocityY = -Math.sin(angleL) * speedL;
         } else {
-          // Odd index: right to left
-          spawnX = screenWidth + 50;
-          spawnY = screenHeight * 0.8 + Phaser.Math.Between(-30, 30);
-          velocityX = Phaser.Math.Between(-420, -320); // Reduced from -550/-400 to -420/-320
-          velocityY = Phaser.Math.Between(-600, -480); // Reduced from -700/-550 to -600/-480
+          spawnX = screenWidth * Phaser.Math.FloatBetween(0.85, 1.0);
+          spawnY = screenHeight + 50;
+          const angleR = Phaser.Math.DegToRad(Phaser.Math.Between(105, 125));
+          const speedR = Phaser.Math.Between(550, 700);
+          velocityX = Math.cos(angleR) * speedR;
+          velocityY = -Math.sin(angleR) * speedR;
         }
         break;
-        
+
       case 'side-throw':
-        // Randomly choose left or right side throw (reduced intensity)
+        // Horizontal throws from sides at mid-height
         if (Math.random() < 0.5) {
-          // From left
+          // From left side
           spawnX = -50;
-          spawnY = screenHeight * (0.5 + Math.random() * 0.2);
-          velocityX = Phaser.Math.Between(250, 380); // Reduced from 300-450 to 250-380
-          velocityY = Phaser.Math.Between(-520, -400); // Reduced from -600/-450 to -520/-400
+          spawnY = screenHeight * Phaser.Math.FloatBetween(0.45, 0.65);
+          velocityX = Phaser.Math.Between(400, 550);
+          velocityY = Phaser.Math.Between(-300, -150); // Slight upward arc
         } else {
-          // From right
+          // From right side
           spawnX = screenWidth + 50;
-          spawnY = screenHeight * (0.5 + Math.random() * 0.2);
-          velocityX = Phaser.Math.Between(-380, -250); // Reduced from -450/-300 to -380/-250
-          velocityY = Phaser.Math.Between(-520, -400); // Reduced from -600/-450 to -520/-400
+          spawnY = screenHeight * Phaser.Math.FloatBetween(0.45, 0.65);
+          velocityX = Phaser.Math.Between(-550, -400);
+          velocityY = Phaser.Math.Between(-300, -150); // Slight upward arc
         }
         break;
         
       default: // 'classic'
-        // Traditional bottom-up throw with some spread
-        if (totalCount === 1) {
-          // Single fruit: spawn in central 60% of screen
-          const centralZone = screenWidth * 0.6;
-          const startPos = screenWidth * 0.2;
-          spawnX = startPos + Math.random() * centralZone;
-        } else {
-          // Multiple fruits: spread across central 70% of screen
-          const centralZone = screenWidth * 0.7;
-          const startPos = screenWidth * 0.15;
-          const spacing = centralZone / Math.max(totalCount - 1, 1);
-          spawnX = startPos + (spacing * index) + Phaser.Math.Between(-30, 30);
-        }
-        
+        // Classic: Natural upward arcs from bottom (Fruit Ninja style)
         spawnY = screenHeight + 50;
-        
-        // Classic upward launch with horizontal variation
-        const speedVariation = totalCount > 1 ? Phaser.Math.Between(-80, 100) : Phaser.Math.Between(-60, 80);
-        const launchSpeed = baseSpeed + speedVariation;
-        velocityX = totalCount > 1 ? Phaser.Math.Between(-120, 120) : Phaser.Math.Between(-100, 100);
-        velocityY = -launchSpeed;
+
+        if (totalCount === 1) {
+          // Single object: launch from random position at bottom
+          spawnX = screenWidth * Phaser.Math.FloatBetween(0.3, 0.7);
+          // Nearly straight up with slight angle variation (80-100 degrees)
+          const angleClassic = Phaser.Math.DegToRad(Phaser.Math.Between(80, 100));
+          const speedClassic = Phaser.Math.Between(520, 680);
+          velocityX = Math.cos(angleClassic) * speedClassic;
+          velocityY = -Math.sin(angleClassic) * speedClassic;
+        } else {
+          // Multiple objects: spread evenly across bottom
+          const startPos = screenWidth * 0.2;
+          const endPos = screenWidth * 0.8;
+          const spacing = (endPos - startPos) / Math.max(totalCount - 1, 1);
+          spawnX = startPos + (spacing * index);
+
+          // Add natural variation to each launch
+          const angleSpread = Phaser.Math.DegToRad(Phaser.Math.Between(75, 105));
+          const speedSpread = Phaser.Math.Between(480, 650);
+          velocityX = Math.cos(angleSpread) * speedSpread;
+          velocityY = -Math.sin(angleSpread) * speedSpread;
+        }
         break;
     }
     
@@ -2588,12 +2860,24 @@ export class FruitSliceGameScene extends Phaser.Scene {
 
   update(): void {
     if (this.isGameOver || this.isPaused) return;
-    
+
+    // FRUIT NINJA STYLE: Apply physics-based rotation to all objects
+    this.fruits.children.entries.forEach(fruit => {
+      const fruitSprite = fruit as Phaser.GameObjects.Image;
+      if (!fruitSprite.active) return;
+
+      const angularVelocity = (fruitSprite as any).angularVelocity;
+      if (angularVelocity !== undefined) {
+        // Apply rotation based on stored angular velocity
+        fruitSprite.rotation += angularVelocity * (1 / 60); // Assuming 60 FPS
+      }
+    });
+
     // Check frenzy mode status
     if (this.isFrenzyMode && this.time.now > this.frenzyModeEndTime) {
       this.deactivateFrenzyMode();
     }
-    
+
     // Check for fruits that fell off screen - simplified logic to ensure consistent life loss
     this.fruits.children.entries.forEach(fruit => {
       const fruitSprite = fruit as Phaser.GameObjects.Image;
