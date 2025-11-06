@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import * as utils from '../utils';
+import { BEARParkAPI } from '../BEARParkAPI';
 
 export class GameOverUIScene extends Phaser.Scene {
   private currentLevelKey: string | null;
@@ -40,6 +41,15 @@ export class GameOverUIScene extends Phaser.Scene {
     this.highScores = data.highScores || [];
     // Reset restart flag
     this.isRestarting = false;
+
+    // Submit score to BEAR Park central leaderboard
+    BEARParkAPI.submitScore(this.finalScore).then(result => {
+      if (result.success && result.is_high_score) {
+        console.log('🎉 New BEAR Park high score!');
+      }
+    }).catch(error => {
+      console.error('Error submitting to BEAR Park:', error);
+    });
   }
 
   create(): void {
