@@ -100,21 +100,21 @@ export class GameOverUIScene extends Phaser.Scene {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 16px;
-          margin-bottom: 12px;
-          border-radius: 12px;
+          padding: 10px 12px;
+          margin-bottom: 8px;
+          border-radius: 8px;
           background: ${bgGradient};
           border-left: ${borderWidth} solid ${borderColor};
           transition: all 0.2s ease;
           font-family: 'Luckiest Guy', cursive;
-        " onmouseover="this.style.transform='translateX(8px)'" onmouseout="this.style.transform='translateX(0)'">
-          <div style="font-size: 24px; color: ${colors.gold}; text-shadow: 2px 2px 0px #000; min-width: 50px;">
+        " onmouseover="this.style.transform='translateX(6px)'" onmouseout="this.style.transform='translateX(0)'">
+          <div style="font-size: 20px; color: ${colors.gold}; text-shadow: 1px 1px 0px #000; min-width: 40px;">
             ${medal || `#${index + 1}`}
           </div>
-          <div style="font-size: 20px; color: #fff; text-shadow: 2px 2px 0px #000; flex: 1; margin: 0 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-            Score: ${entry.score.toLocaleString()}
+          <div style="font-size: 18px; color: #fff; text-shadow: 1px 1px 0px #000; flex: 1; margin: 0 10px;">
+            ${entry.score.toLocaleString()}
           </div>
-          <div style="font-size: 16px; color: ${colors.yellow}; text-shadow: 2px 2px 0px #000;">
+          <div style="font-size: 13px; color: ${colors.yellow}; text-shadow: 1px 1px 0px #000;">
             ${entry.date}
           </div>
         </div>
@@ -127,26 +127,31 @@ export class GameOverUIScene extends Phaser.Scene {
         top: 0;
         left: 0;
         width: 100%;
-        height: 100%;
+        height: 100vh;
         background: linear-gradient(180deg, ${colors.charcoal} 0%, ${colors.ink} 100%);
         z-index: 10000;
-        overflow-y: auto;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         font-family: 'Luckiest Guy', cursive;
       ">
         <div style="
           max-width: 600px;
-          margin: 0 auto;
-          padding: 40px 20px;
-          padding-bottom: calc(160px + env(safe-area-inset-bottom));
+          width: 100%;
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          max-height: 100vh;
         ">
 
           <!-- Game Over Title -->
           <div style="
-            font-size: 64px;
+            font-size: 48px;
             text-align: center;
             color: #ff3333;
-            text-shadow: 5px 5px 0px #000000;
-            margin-bottom: 20px;
+            text-shadow: 4px 4px 0px #000000;
             animation: gameOverPulse 1s ease-in-out infinite alternate;
             font-family: 'Luckiest Guy', cursive;
           ">GAME OVER</div>
@@ -157,9 +162,8 @@ export class GameOverUIScene extends Phaser.Scene {
           <div style="
             position: relative;
             background: radial-gradient(500px 200px at 50% -20%, rgba(118,174,255,.12), transparent 60%), ${colors.ink};
-            border-radius: 28px;
-            padding: 32px;
-            margin-bottom: 24px;
+            border-radius: 20px;
+            padding: 20px;
             isolation: isolate;
           ">
             <!-- Tri-color border -->
@@ -167,8 +171,8 @@ export class GameOverUIScene extends Phaser.Scene {
               content: '';
               position: absolute;
               inset: 0;
-              border-radius: 28px;
-              padding: 4px;
+              border-radius: 20px;
+              padding: 3px;
               background: linear-gradient(135deg, ${colors.purple} 0%, ${colors.purple} 33.33%, ${colors.yellow} 33.33%, ${colors.yellow} 66.66%, ${colors.green} 66.66%, ${colors.green} 100%);
               -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
               -webkit-mask-composite: xor;
@@ -178,32 +182,31 @@ export class GameOverUIScene extends Phaser.Scene {
               opacity: 1;
             "></div>
 
-            <div style="font-size: 24px; color: ${colors.gold}; text-shadow: 2px 2px 0px rgba(0,0,0,0.5); margin-bottom: 8px; text-transform: uppercase; text-align: center;">
+            <div style="font-size: 18px; color: ${colors.gold}; text-shadow: 2px 2px 0px rgba(0,0,0,0.5); margin-bottom: 4px; text-transform: uppercase; text-align: center; position: relative; z-index: 1;">
               FINAL SCORE
             </div>
-            <div style="font-size: 56px; color: #fff; text-shadow: 4px 4px 0px rgba(0,0,0,0.5); text-align: center;">
+            <div style="font-size: 40px; color: #fff; text-shadow: 3px 3px 0px rgba(0,0,0,0.5); text-align: center; position: relative; z-index: 1;">
               ${this.finalScore.toLocaleString()}
             </div>
-            <div style="font-size: 18px; color: #fff; text-align: center; margin-top: 8px;">Can you slice more 🐻 artifacts?</div>
           </div>
 
           <!-- Leaderboard Title -->
           <div style="
-            font-size: 32px;
+            font-size: 24px;
             color: ${colors.gold};
-            text-shadow: 3px 3px 0px #000;
+            text-shadow: 2px 2px 0px #000;
             text-align: center;
-            margin-bottom: 16px;
             text-transform: uppercase;
             font-family: 'Luckiest Guy', cursive;
-          ">🏆 TOP 10 SCORES 🏆</div>
+          ">🏆 TOP 5 SCORES 🏆</div>
 
-          <!-- Leaderboard -->
+          <!-- Leaderboard (scrollable) -->
           <div style="
             background: radial-gradient(500px 200px at 50% -20%, rgba(118,174,255,.08), transparent 60%), ${colors.ink};
-            border-radius: 20px;
-            padding: 20px;
-            margin-bottom: 24px;
+            border-radius: 16px;
+            padding: 12px;
+            max-height: 200px;
+            overflow-y: auto;
           ">
             ${leaderboardHTML}
           </div>
@@ -213,22 +216,21 @@ export class GameOverUIScene extends Phaser.Scene {
             id="restart-button"
             style="
               width: 100%;
-              padding: 20px;
-              font-size: 36px;
+              padding: 16px;
+              font-size: 28px;
               font-family: 'Luckiest Guy', cursive;
               background: linear-gradient(135deg, #ff3333 0%, #cc0000 100%);
               color: #fff;
-              border: 4px solid rgba(255,255,255,.3);
-              border-radius: 16px;
+              border: 3px solid rgba(255,255,255,.3);
+              border-radius: 12px;
               cursor: pointer;
-              box-shadow: 0 6px 20px rgba(255,51,51,.5);
+              box-shadow: 0 4px 16px rgba(255,51,51,.5);
               transition: all 0.2s ease;
-              text-shadow: 3px 3px 0px #000;
+              text-shadow: 2px 2px 0px #000;
               animation: blink 1s ease-in-out infinite alternate;
-              margin-bottom: 16px;
             "
-            onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 8px 24px rgba(255,51,51,.7)';"
-            onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 6px 20px rgba(255,51,51,.5)';"
+            onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(255,51,51,.7)';"
+            onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 16px rgba(255,51,51,.5)';"
             onmousedown="this.style.transform='scale(0.95)';"
             onmouseup="this.style.transform='scale(1.05)';"
           >
@@ -240,13 +242,13 @@ export class GameOverUIScene extends Phaser.Scene {
             id="menu-button"
             style="
               width: 100%;
-              padding: 16px;
-              font-size: 24px;
+              padding: 12px;
+              font-size: 20px;
               font-family: 'Luckiest Guy', cursive;
               background: rgba(255,255,255,0.1);
               color: #fff;
-              border: 3px solid rgba(255,255,255,.3);
-              border-radius: 12px;
+              border: 2px solid rgba(255,255,255,.3);
+              border-radius: 10px;
               cursor: pointer;
               transition: all 0.2s ease;
               text-shadow: 2px 2px 0px #000;
