@@ -3,7 +3,7 @@
  * Submits scores to central bearpark.xyz leaderboard
  */
 
-const BEAR_API_URL = 'https://bearpark.xyz/api';
+const BEAR_API_URL = 'https://www.bearpark.xyz/api';
 const GAME_ID = 'bear-slice';
 
 export interface ScoreSubmissionResult {
@@ -29,10 +29,76 @@ export class BEARParkAPI {
   }
 
   /**
+   * Get the current user's formatted display name with full fallback logic
+   * This checks multiple sources in order:
+   * 1. display_name from localStorage (custom name set on BEAR Park)
+   * 2. twitter_username from localStorage
+   * 3. Formatted wallet address (first 4...last 4)
+   * 4. 'Anonymous' as final fallback
+   */
+  static getCurrentUserDisplayName(): string {
+    // Check for custom display name
+    const displayName = localStorage.getItem('display_name');
+    if (displayName && displayName.trim() !== '') {
+      return displayName;
+    }
+
+    // Check for Twitter username
+    const twitterUsername = localStorage.getItem('twitter_username');
+    if (twitterUsername && twitterUsername.trim() !== '') {
+      return twitterUsername;
+    }
+
+    // Use formatted wallet address
+    const walletAddress = this.getWalletAddress();
+    if (walletAddress) {
+      return this.formatWalletAddress(walletAddress);
+    }
+
+    return 'Anonymous';
+  }
+
+  /**
    * Check if user is authenticated with XAMAN wallet
    */
   static isAuthenticated(): boolean {
     return !!this.getWalletAddress();
+  }
+
+  /**
+   * Format wallet address to show first 4 and last 4 characters
+   * @param walletAddress - The full wallet address
+   * @returns Formatted wallet address (e.g., "rABC...XYZ1")
+   */
+  static formatWalletAddress(walletAddress: string): string {
+    if (!walletAddress || walletAddress.length < 8) {
+      return walletAddress;
+    }
+    return `${walletAddress.substring(0, 4)}...${walletAddress.substring(walletAddress.length - 4)}`;
+  }
+
+  /**
+   * Get display name for a leaderboard entry with fallback logic:
+   * 1. Custom display_name from profile
+   * 2. Twitter username
+   * 3. Formatted wallet address (first 4...last 4)
+   * @param entry - Leaderboard entry with user data
+   * @returns Formatted display name
+   */
+  static formatDisplayName(entry: any): string {
+    if (entry.display_name) {
+      return entry.display_name;
+    }
+
+    if (entry.twitter_username) {
+      return entry.twitter_username;
+    }
+
+    if (entry.wallet_address) {
+      return this.formatWalletAddress(entry.wallet_address);
+    }
+
+    return 'Anonymous';
   }
 
   /**

@@ -2,6 +2,7 @@ import { defineConfig } from "vite"
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/bear-ninja/',
   server: {
     host: "::",
     port: 8080,

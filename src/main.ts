@@ -19,6 +19,9 @@ const config: Phaser.Types.Core.GameConfig = {
   dom: {
     createContainer: true
   },
+  loader: {
+    baseURL: '/bear-ninja/',
+  },
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
