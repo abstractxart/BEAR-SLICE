@@ -3001,7 +3001,14 @@ export class FruitSliceGameScene extends Phaser.Scene {
     
     // Play game over sound
     this.gameOverSound?.play();
-    
+
+    // Award honey points for time played
+    const minutesPlayed = (this.time.now - this.gameStartTime) / 60000;
+    console.log(`🍯 Game duration: ${minutesPlayed.toFixed(2)} minutes`);
+    if ((window as any).awardGamePoints) {
+      (window as any).awardGamePoints('bear-ninja', minutesPlayed);
+    }
+
     // Launch game over UI
     this.scene.launch("GameOverUIScene", {
       currentLevelKey: this.scene.key,
