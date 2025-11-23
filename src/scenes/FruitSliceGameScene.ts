@@ -1168,16 +1168,6 @@ export class FruitSliceGameScene extends Phaser.Scene {
     // Create minimal slice effect (no distracting text/popups)
     this.createMinimalGoldenSliceEffect(goldenFruit, this.goldenFruitSliceCount);
     
-    // FRUIT NINJA DIFFICULTY: Rapid movement progression
-    // Change movement pattern every 2 slices for constant challenge
-    const newPhase = Math.min(6, Math.floor(this.goldenFruitSliceCount / 2)); // Change every 2 slices, up to phase 6
-    const currentPhase = (this.activeGoldenFruit as any).currentMovementPhase || 0;
-    
-    if (newPhase > currentPhase) {
-      (this.activeGoldenFruit as any).currentMovementPhase = newPhase;
-      this.startHourglassMovementPhase(this.activeGoldenFruit, newPhase);
-    }
-    
     // Check if we've reached max slices
     if (this.goldenFruitSliceCount >= gameplayConfig.goldenFruitMaxSlices.value) {
       this.finalizeGoldenFruit();
@@ -1214,29 +1204,36 @@ export class FruitSliceGameScene extends Phaser.Scene {
     // Pause fruit spawning during hourglass mode
     this.pauseFruitSpawning();
     
-    // Make the hourglass float in air (remove gravity and set gentle floating motion)
+    // Make the hourglass float in slow-motion like Fruit Ninja pomegranate
     const body = goldenFruit.body as Phaser.Physics.Arcade.Body;
     if (body) {
-      // Stop all movement and make it float
-      body.setVelocity(0, 0);
-      body.setGravityY(0); // Remove gravity completely
-      
-      // Position it in a good floating spot
+      // Set hourglass depth to be above all slice animations
+      goldenFruit.setDepth(50);
+
+      // Position it in center floating spot
       const floatX = this.scale.gameSize.width / 2;
       const floatY = this.scale.gameSize.height / 2 - 50;
       goldenFruit.setPosition(floatX, floatY);
-      
-      // Set hourglass depth to be above all slice animations
-      goldenFruit.setDepth(50);
-      
-      // CHALLENGING MECHANIC 3: Progressive movement patterns
-      // Store initial position for movement reference
-      (goldenFruit as any).initialX = floatX;
-      (goldenFruit as any).initialY = floatY;
-      (goldenFruit as any).currentMovementPhase = 0;
-      
-      // Start with gentle floating animation (will be replaced with more challenging patterns)
-      this.startHourglassMovementPhase(goldenFruit, 0);
+
+      // Remove gravity for weightless floating
+      body.setGravityY(0);
+
+      // Set gentle initial drift velocity for organic floating feel
+      body.setVelocity(
+        (Math.random() - 0.5) * 30, // Slow horizontal drift
+        (Math.random() - 0.5) * 20  // Slow vertical drift
+      );
+
+      // Add drag for smooth, dreamy slowdown
+      body.setDrag(10, 10);
+
+      // Enable world bounds bouncing for contained floating
+      body.setBounce(0.8, 0.8); // Soft bounce
+      body.setCollideWorldBounds(true);
+
+      // Store floating state
+      (goldenFruit as any).isFloating = true;
+      (goldenFruit as any).lastVelocityChange = this.time.now;
     }
     
     // Activate dramatic zoom effect (Fruit Ninja style)
@@ -1490,9 +1487,9 @@ export class FruitSliceGameScene extends Phaser.Scene {
       ease: 'Power2'
     });
     
-    // Make camera follow the golden fruit smoothly
+    // Make camera follow the golden fruit with dreamy smooth tracking
     this.cameras.main.stopFollow();
-    this.cameras.main.startFollow(goldenFruit, true, 0.1, 0.1);
+    this.cameras.main.startFollow(goldenFruit, true, 0.05, 0.05); // Very smooth following
     
     // Initial smooth zoom to the golden fruit position
     this.tweens.add({
@@ -2874,6 +2871,34 @@ export class FruitSliceGameScene extends Phaser.Scene {
         dangerGlow.setPosition(fruitSprite.x, fruitSprite.y);
       }
     });
+
+    // Update hourglass floating physics for organic Fruit Ninja feel
+    if (this.activeGoldenFruit && this.activeGoldenFruit.active) {
+      const body = this.activeGoldenFruit.body as Phaser.Physics.Arcade.Body;
+      if (body && (this.activeGoldenFruit as any).isFloating) {
+        const lastChange = (this.activeGoldenFruit as any).lastVelocityChange || 0;
+
+        // Apply gentle random force every 800-1200ms for organic drift
+        if (this.time.now - lastChange > 800 + Math.random() * 400) {
+          const forceX = (Math.random() - 0.5) * 15;
+          const forceY = (Math.random() - 0.5) * 10;
+
+          body.setVelocity(
+            body.velocity.x + forceX,
+            body.velocity.y + forceY
+          );
+
+          // Cap max velocity for slow-motion feel
+          const maxVel = 40;
+          if (body.velocity.x > maxVel) body.velocity.x = maxVel;
+          if (body.velocity.x < -maxVel) body.velocity.x = -maxVel;
+          if (body.velocity.y > maxVel) body.velocity.y = maxVel;
+          if (body.velocity.y < -maxVel) body.velocity.y = -maxVel;
+
+          (this.activeGoldenFruit as any).lastVelocityChange = this.time.now;
+        }
+      }
+    }
 
     // Check frenzy mode status
     if (this.isFrenzyMode && this.time.now > this.frenzyModeEndTime) {
