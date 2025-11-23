@@ -3437,20 +3437,25 @@ export class FruitSliceGameScene extends Phaser.Scene {
   }
 
   createBombGlow(bomb: Phaser.GameObjects.Image): void {
-    // Create a red glowing circle behind the bomb to signify danger
-    const glowSize = 90; // Size of the glow
-    const glow = this.add.circle(bomb.x, bomb.y, glowSize, 0xff0000, 0.4);
-    glow.setDepth(-1); // Behind the bomb (bombs are at depth 0)
+    // Create a multi-layered red glow effect for bombs
+    const glowContainer = this.add.container(bomb.x, bomb.y);
+    glowContainer.setDepth(-1); // Behind the bomb (bombs are at depth 0)
 
-    // Store reference to glow on the bomb object for updating position
-    (bomb as any).dangerGlow = glow;
+    // Create multiple circles for a layered glow effect (outer to inner)
+    const outerGlow = this.add.circle(0, 0, 100, 0xff0000, 0.3);
+    const middleGlow = this.add.circle(0, 0, 70, 0xff0000, 0.5);
+    const innerGlow = this.add.circle(0, 0, 45, 0xff3333, 0.7);
+
+    glowContainer.add([outerGlow, middleGlow, innerGlow]);
+
+    // Store reference to glow container on the bomb object for updating position
+    (bomb as any).dangerGlow = glowContainer;
 
     // Add pulsing animation to make it more noticeable
     this.tweens.add({
-      targets: glow,
-      alpha: 0.2,
-      scaleX: 1.2,
-      scaleY: 1.2,
+      targets: glowContainer,
+      scaleX: 1.15,
+      scaleY: 1.15,
       duration: 600,
       yoyo: true,
       repeat: -1,
