@@ -77,24 +77,19 @@ export default class UIScene extends Phaser.Scene {
             🔥 LEVEL UP! 🔥
           </div>
           
-          <!-- Hourglass Mode Indicator -->
-          <div id="golden-fruit-zoom-mode" class="game-3d-container-clickable-yellow-400 px-4 py-2 text-xl font-bold mt-2" style="display: none; animation: goldenPulse 0.8s infinite alternate;">
-            <div>HOURGLASS MODE ACTIVATED</div>
-            <div class="text-lg mt-1">SWIPE!</div>
+          <!-- Hourglass Mode Indicator - Minimal like Fruit Ninja -->
+          <div id="golden-fruit-zoom-mode" style="display: none;">
+            <!-- Removed text banners for clean Fruit Ninja style -->
           </div>
-          
-          <!-- Golden Fruit Slice Counter -->
-          <div id="golden-fruit-indicator" class="game-3d-container-clickable-yellow-500 px-3 py-1 text-lg font-bold animate-pulse mt-2" style="display: none;">
-            SLICE COUNT: 0/20
+
+          <!-- Golden Fruit Slice Counter - Small and minimal -->
+          <div id="golden-fruit-indicator" class="px-2 py-1 text-xs font-bold mt-2" style="display: none; color: #ffd700; text-shadow: 0 0 10px rgba(255,215,0,0.8); opacity: 0.85;">
+            0/20
           </div>
-          
-          <!-- Golden Fruit Progress Bar -->
-          <div id="golden-fruit-progress" class="mt-2" style="display: none;">
-            <div class="game-3d-container-slot-gray-800 w-48 h-2 mx-auto relative">
-              <div id="golden-fruit-progress-fill" class="game-3d-container-progress-fill-yellow-500 h-full transition-all duration-300" style="width: 0%;">
-              </div>
-            </div>
-            <div class="text-yellow-300 text-sm font-bold mt-1">TIME REMAINING</div>
+
+          <!-- Golden Fruit Progress Bar - Removed for cleaner look -->
+          <div id="golden-fruit-progress" style="display: none;">
+            <!-- Progress bar removed - Fruit Ninja style uses minimal UI -->
           </div>
         </div>
 
@@ -381,29 +376,13 @@ export default class UIScene extends Phaser.Scene {
     }
     
     if (sliceIndicator) {
-      sliceIndicator.textContent = "SLICE COUNT: 0/20";
+      sliceIndicator.textContent = "0/20";
       sliceIndicator.style.display = "block";
     }
-    
+
+    // Progress bar removed for clean Fruit Ninja style
     if (progressBar) {
-      progressBar.style.display = "block";
-    }
-    
-    if (progressFill) {
-      progressFill.style.width = "100%";
-      // Animate progress bar countdown over 11 seconds
-      this.tweens.add({
-        targets: { progress: 100 },
-        progress: 0,
-        duration: 11000, // 11 second duration
-        ease: 'Linear',
-        onUpdate: (tween) => {
-          const value = tween.getValue();
-          if (progressFill) {
-            progressFill.style.width = `${value}%`;
-          }
-        }
-      });
+      progressBar.style.display = "none";
     }
   }
 
@@ -428,22 +407,17 @@ export default class UIScene extends Phaser.Scene {
   showGoldenFruit(data: any): void {
     const goldenIndicator = document.getElementById("golden-fruit-indicator");
     if (goldenIndicator) {
-      // Update text to show slice count
-      goldenIndicator.textContent = `SLICE COUNT: ${data.slice}/${data.totalSlices}`;
+      // Update text to show minimal slice count (Fruit Ninja style)
+      goldenIndicator.textContent = `${data.slice}/${data.totalSlices}`;
       goldenIndicator.style.display = "block";
-      
-      // Add increasing glow effect based on slice count
-      const glowIntensity = Math.min(data.slice * 10, 100);
-      goldenIndicator.style.textShadow = `0 0 ${glowIntensity}px #ffd700, 0 0 ${glowIntensity * 2}px #ffd700`;
-      
-      // Hide after 3 seconds if this is the final slice for extended satisfaction
+
+      // Add subtle increasing glow effect based on slice count
+      const glowIntensity = Math.min(data.slice * 5, 50);
+      goldenIndicator.style.textShadow = `0 0 ${glowIntensity}px rgba(255,215,0,0.8)`;
+
+      // Hide after completion
       if (data.slice >= data.totalSlices) {
-        // Show completion message
-        goldenIndicator.textContent = "GOLDEN FRENZY COMPLETE!";
-        goldenIndicator.style.color = "#FFD700";
-        goldenIndicator.style.fontSize = "28px";
-        
-        this.time.delayedCall(3000, () => {
+        this.time.delayedCall(1500, () => {
           goldenIndicator.style.display = "none";
         });
       }

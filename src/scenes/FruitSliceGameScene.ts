@@ -1454,9 +1454,9 @@ export class FruitSliceGameScene extends Phaser.Scene {
     if (this.isGoldenFruitZoomed) return;
     
     this.isGoldenFruitZoomed = true;
-    
+
     // Calculate zoom level and target position
-    const zoomLevel = 1.8; // 1.8x zoom for dramatic effect
+    const zoomLevel = 1.3; // 1.3x zoom for subtle Fruit Ninja style effect
     const targetX = goldenFruit.x;
     const targetY = goldenFruit.y;
     
