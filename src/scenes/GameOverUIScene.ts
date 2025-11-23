@@ -410,6 +410,35 @@ export class GameOverUIScene extends Phaser.Scene {
             MAIN MENU
           </button>
 
+          <!-- Back to BEAR Park Button -->
+          <button
+            id="bearpark-button"
+            style="
+              width: 100%;
+              padding: 12px;
+              font-size: 20px;
+              font-family: 'Luckiest Guy', cursive;
+              background: linear-gradient(135deg, ${colors.purple} 0%, ${colors.green} 100%);
+              color: #fff;
+              border: 3px solid ${colors.gold};
+              border-radius: 10px;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              text-shadow: 2px 2px 0px #000;
+              box-shadow: 0 4px 16px rgba(104, 12, 217, 0.5);
+              pointer-events: auto;
+              touch-action: manipulation;
+            "
+            onmouseover="this.style.transform='scale(1.03)'; this.style.boxShadow='0 5px 20px rgba(104, 12, 217, 0.7)';"
+            onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 16px rgba(104, 12, 217, 0.5)';"
+            onmousedown="this.style.transform='scale(0.97)';"
+            onmouseup="this.style.transform='scale(1.03)';"
+            ontouchstart="this.style.transform='scale(0.97)';"
+            ontouchend="this.style.transform='scale(1)';"
+          >
+            🐻 BACK TO BEARPARK
+          </button>
+
         </div>
 
         <!-- Custom Animations -->
@@ -454,6 +483,7 @@ export class GameOverUIScene extends Phaser.Scene {
     // Setup button click handlers
     const restartButton = document.getElementById('restart-button');
     const menuButton = document.getElementById('menu-button');
+    const bearparkButton = document.getElementById('bearpark-button');
 
     if (restartButton) {
       restartButton.addEventListener('click', (e) => {
@@ -468,6 +498,14 @@ export class GameOverUIScene extends Phaser.Scene {
         e.preventDefault();
         e.stopPropagation();
         this.goToMainMenu();
+      });
+    }
+
+    if (bearparkButton) {
+      bearparkButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.goToBEARPark();
       });
     }
 
@@ -680,6 +718,12 @@ export class GameOverUIScene extends Phaser.Scene {
 
     // Go to title screen
     this.scene.start("TitleScreen");
+  }
+
+  goToBEARPark(): void {
+    console.log("Redirecting to BEAR Park");
+    // Redirect to BEAR Park homepage
+    window.location.href = 'https://bearpark.xyz';
   }
 
   update(): void {
