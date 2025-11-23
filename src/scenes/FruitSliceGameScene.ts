@@ -1008,8 +1008,8 @@ export class FruitSliceGameScene extends Phaser.Scene {
       this.events.emit('comboUpdated', this.combo);
     });
     
-    // Create combo text effect for high combos
-    if (this.combo >= 5) {
+    // Create combo text effect for high combos (not during hourglass mode)
+    if (this.combo >= 5 && !this.activeGoldenFruit) {
       this.createComboText(this.combo);
     }
     
@@ -2081,38 +2081,16 @@ export class FruitSliceGameScene extends Phaser.Scene {
   createMinimalGoldenSliceEffect(goldenFruit: Phaser.GameObjects.Image, sliceNumber: number): void {
     const centerX = goldenFruit.x;
     const centerY = goldenFruit.y;
-    
-    // Minimal visual feedback - just a quick flash and slice line
+
+    // Ultra-minimal Fruit Ninja style - just particles, no lines or text
     const colors = [0x6A0DAD, 0xFFD700, 0x00FF00];
     const currentColor = colors[sliceNumber % colors.length];
-    
-    // Quick slice line only
-    const angle = Math.random() * Math.PI * 2;
-    const length = 80; // Shorter than before
-    
-    const startX = centerX - Math.cos(angle) * length;
-    const startY = centerY - Math.sin(angle) * length;
-    const endX = centerX + Math.cos(angle) * length;
-    const endY = centerY + Math.sin(angle) * length;
-    
-    const sliceLine = this.add.line(0, 0, startX, startY, endX, endY, currentColor);
-    sliceLine.setLineWidth(6); // Thinner line
-    sliceLine.setAlpha(0.8);
-    sliceLine.setDepth(5);
-    
-    this.tweens.add({
-      targets: sliceLine,
-      alpha: 0,
-      duration: 200, // Much faster fade
-      ease: 'Power2',
-      onComplete: () => sliceLine.destroy()
-    });
-    
-    // Minimal particle burst
+
+    // Minimal particle burst only
     const emitter = this.juiceEmitters.get(currentColor);
     if (emitter) {
       emitter.setPosition(centerX, centerY);
-      emitter.explode(5); // Very few particles
+      emitter.explode(3); // Very few particles for clean look
     }
   }
 
