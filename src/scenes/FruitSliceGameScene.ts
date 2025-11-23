@@ -1347,7 +1347,13 @@ export class FruitSliceGameScene extends Phaser.Scene {
     // Simply remove bomb without explosion during hourglass mode
     bomb.setActive(false);
     bomb.setVisible(false);
-    
+
+    // Destroy the danger glow if it exists
+    const dangerGlow = (bomb as any).dangerGlow;
+    if (dangerGlow) {
+      dangerGlow.destroy();
+    }
+
     // Create small puff effect to indicate bomb was neutralized
     const emitter = this.juiceEmitters.get(0x666666);
     if (emitter) {
@@ -2204,11 +2210,17 @@ export class FruitSliceGameScene extends Phaser.Scene {
     
     // Screen shake
     this.cameras.main.shake(400, 15);
-    
-    // Remove bomb
+
+    // Remove bomb and its glow
     bomb.setActive(false);
     bomb.setVisible(false);
-    
+
+    // Destroy the danger glow if it exists
+    const dangerGlow = (bomb as any).dangerGlow;
+    if (dangerGlow) {
+      dangerGlow.destroy();
+    }
+
     // End game immediately (classic Fruit Ninja behavior)
     this.gameOver();
   }
@@ -2476,10 +2488,15 @@ export class FruitSliceGameScene extends Phaser.Scene {
     
     // Add trail effect for flying objects
     this.createFruitTrail(fruit, fruitData);
-    
+
     // Add magical sparkles for hourglass
     if (fruitData.isGolden) {
       this.createHourglassSparkles(fruit);
+    }
+
+    // Add red danger glow for bombs
+    if (fruitData.isBomb) {
+      this.createBombGlow(fruit);
     }
   }
 
@@ -2871,6 +2888,12 @@ export class FruitSliceGameScene extends Phaser.Scene {
         // Apply rotation based on stored angular velocity
         fruitSprite.rotation += angularVelocity * (1 / 60); // Assuming 60 FPS
       }
+
+      // Update bomb glow position to follow the bomb
+      const dangerGlow = (fruitSprite as any).dangerGlow;
+      if (dangerGlow && dangerGlow.active) {
+        dangerGlow.setPosition(fruitSprite.x, fruitSprite.y);
+      }
     });
 
     // Check frenzy mode status
@@ -2917,6 +2940,12 @@ export class FruitSliceGameScene extends Phaser.Scene {
         }
         fruitSprite.setActive(false);
         fruitSprite.setVisible(false);
+
+        // Destroy the danger glow if it exists
+        const dangerGlow = (fruitSprite as any).dangerGlow;
+        if (dangerGlow) {
+          dangerGlow.destroy();
+        }
       }
     });
     
@@ -3404,6 +3433,28 @@ export class FruitSliceGameScene extends Phaser.Scene {
 
   createHourglassSparkles(hourglass: Phaser.GameObjects.Image): void {
     // Hourglass sparkle particles completely removed for clean gameplay experience
+  }
+
+  createBombGlow(bomb: Phaser.GameObjects.Image): void {
+    // Create a red glowing circle behind the bomb to signify danger
+    const glowSize = 90; // Size of the glow
+    const glow = this.add.circle(bomb.x, bomb.y, glowSize, 0xff0000, 0.4);
+    glow.setDepth(-1); // Behind the bomb (bombs are at depth 0)
+
+    // Store reference to glow on the bomb object for updating position
+    (bomb as any).dangerGlow = glow;
+
+    // Add pulsing animation to make it more noticeable
+    this.tweens.add({
+      targets: glow,
+      alpha: 0.2,
+      scaleX: 1.2,
+      scaleY: 1.2,
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
   }
 
   initializeBackgroundMusic(): void {
