@@ -291,12 +291,13 @@ export class FruitSliceGameScene extends Phaser.Scene {
   createBackground(): void {
     // Create mystical ninja dojo background - centered in screen
     this.background = this.add.image(
-      this.scale.gameSize.width / 2, 
-      this.scale.gameSize.height / 2, 
+      this.scale.gameSize.width / 2,
+      this.scale.gameSize.height / 2,
       "ninja_dojo_background"
     );
     utils.initScale(this.background, { x: 0.5, y: 0.5 }, this.scale.gameSize.width, this.scale.gameSize.height);
     this.background.setScrollFactor(0);
+    this.background.setDepth(-100); // Set background behind all game objects
   }
 
   initializeSounds(): void {
