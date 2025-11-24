@@ -3007,16 +3007,28 @@ export class FruitSliceGameScene extends Phaser.Scene {
     console.log(`🍯 Game duration: ${minutesPlayed.toFixed(2)} minutes`);
     if ((window as any).awardGamePoints) {
       (window as any).awardGamePoints('bear-ninja', minutesPlayed);
-    }
 
-    // Launch game over UI
-    this.scene.launch("GameOverUIScene", {
-      currentLevelKey: this.scene.key,
-      finalScore: this.score,
-      newRank: newRank,
-      isHighScore: isHighScore,
-      highScores: highScores
-    });
+      // Wait for honey points overlay to finish (auto-dismisses after 5 seconds)
+      // Then show game over UI
+      this.time.delayedCall(5500, () => {
+        this.scene.launch("GameOverUIScene", {
+          currentLevelKey: this.scene.key,
+          finalScore: this.score,
+          newRank: newRank,
+          isHighScore: isHighScore,
+          highScores: highScores
+        });
+      });
+    } else {
+      // No honey points system available, show game over UI immediately
+      this.scene.launch("GameOverUIScene", {
+        currentLevelKey: this.scene.key,
+        finalScore: this.score,
+        newRank: newRank,
+        isHighScore: isHighScore,
+        highScores: highScores
+      });
+    }
   }
 
   getDifficultyLevel(): number {
